@@ -25,6 +25,7 @@ class PreviewLabel(QLabel):
         self._rubber = None
         self._frame_size = (0, 0)      # 当前帧的原始尺寸 (w, h)
         self._pixmap_rect = QRect()    # 当前显示 pixmap 在 label 内的实际矩形
+        self._source_pixmap = None     # 保存原始未缩放的 pixmap，用于 resize 时重新缩放
 
     def set_select_mode(self, on: bool, target: str = ""):
         self._selecting = on
@@ -33,14 +34,26 @@ class PreviewLabel(QLabel):
         self.setCursor(Qt.CrossCursor if on else Qt.ArrowCursor)
 
     def update_frame(self, pixmap):
+        self._source_pixmap = pixmap
+        self._apply_pixmap()
+
+    def _apply_pixmap(self):
+        """将原始 pixmap 缩放到当前控件尺寸并显示，同时更新 _pixmap_rect。"""
+        if self._source_pixmap is None or self._source_pixmap.isNull():
+            return
         from PyQt5.QtGui import QPixmap
-        scaled = pixmap.scaled(self.size(), Qt.KeepAspectRatio,
-                               Qt.SmoothTransformation)
-        # 计算 letterbox 偏移
+        scaled = self._source_pixmap.scaled(self.size(), Qt.KeepAspectRatio,
+                                            Qt.SmoothTransformation)
+        if scaled.isNull():
+            return
         x = (self.width() - scaled.width()) // 2
         y = (self.height() - scaled.height()) // 2
         self._pixmap_rect = QRect(x, y, scaled.width(), scaled.height())
         self.setPixmap(scaled)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._apply_pixmap()
 
     def set_frame_size(self, w, h):
         self._frame_size = (w, h)
